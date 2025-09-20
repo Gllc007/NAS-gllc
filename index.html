@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Formulario NAS v7.0 (Firebase)</title>
+  <link rel="stylesheet" href="assets/styles.css?v=7.0">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <strong>Escala NAS</strong>
+      <span id="facilityBadge" class="badge-top" style="display:none"></span>
+    </div>
+    <div class="topbar-right">
+      <button id="logoutBtn" class="link" style="display:none">Cambiar centro</button>
+    </div>
+  </header>
+
+  <main class="container" id="appRoot"></main>
+
+  <footer class="footer">
+    Creado por Glopez_ Ciudad — Enfermero
+  </footer>
+
+  <script>
+    window.FIREBASE_CONFIG = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_PROYECTO.firebaseapp.com",
+      projectId: "TU_PROYECTO",
+      storageBucket: "TU_PROYECTO.appspot.com",
+      messagingSenderId: "ID",
+      appId: "APP_ID"
+    };
+  </script>
+  <script type="module" src="assets/app.js?v=7.0"></script>
+</body>
+</html>
