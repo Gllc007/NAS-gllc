@@ -3,11 +3,29 @@ import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
 
 /* ==================== Firebase ==================== */
-const app = initializeApp(window.FIREBASE_CONFIG);
-const db = getFirestore(app);
-const auth = getAuth(app);
-await signInAnonymously(auth);
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
 
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyDC-7Fagf2JtaiUyzHM87ZCSfUcv50fRYQ",
+    authDomain: "nas-gllc.firebaseapp.com",
+    projectId: "nas-gllc",
+    storageBucket: "nas-gllc.firebasestorage.app",
+    messagingSenderId: "380143309126",
+    appId: "1:380143309126:web:07c6c8ace3748aa7d95547",
+    measurementId: "G-KH9996N47T"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
 /* ==================== Catálogo NAS ==================== */
 const NAS = {
   "1a": { label: "Control de Signos Vitales por horario", weight: 4.5 },
