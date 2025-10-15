@@ -19,19 +19,12 @@ button.secondary{background:#444}
 button:disabled{opacity:.6}
 table{width:100%;border-collapse:collapse}
 th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
-/* Zebra */
 .zebra .item{background:#f8faff;border-color:#e6ecff}
 .zebra .item:nth-of-type(2n){background:#f2f6ff;border-color:#dbe6ff}
-/* Exclusive -> gray override */
 .item.exclusive{background:#efefef !important;border-color:#d9d9d9 !important}
 .item.exclusive .badge{background:#d9d9d9;color:#222}
 .item:hover{border-color:#bcd0ff;background:#eef4ff}
 .footer{background:#222;color:#eee;text-align:center;padding:12px;font-size:14px}
 .helper{font-size:12.5px;color:#666}
 .mt12{margin-top:12px}
-@media print {
-  body{background:#fff}
-  .card{box-shadow:none;border:0}
-  #exportCsv,#dupLast,#printBtn{display:none}
-  .footer,.topbar{display:none}
-}
+@media print {.footer,.topbar{display:none}}

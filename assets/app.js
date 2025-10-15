@@ -1,32 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
-
-/* ==================== Firebase ==================== */
-<script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyDC-7Fagf2JtaiUyzHM87ZCSfUcv50fRYQ",
-    authDomain: "nas-gllc.firebaseapp.com",
-    projectId: "nas-gllc",
-    storageBucket: "nas-gllc.firebasestorage.app",
-    messagingSenderId: "380143309126",
-    appId: "1:380143309126:web:07c6c8ace3748aa7d95547",
-    measurementId: "G-KH9996N47T"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
-/* ==================== Catálogo NAS ==================== */
+// v7.2 FULL — Google Sheets backend (Apps Script Web App)
 const NAS = {
   "1a": { label: "Control de Signos Vitales por horario", weight: 4.5 },
   "1b": { label: "Observación continua o activa durante 2 horas o más", weight: 12.1 },
@@ -59,69 +31,43 @@ const NAS = {
   "20": { label: "Nutrición parenteral", weight: 2.9 },
   "21": { label: "Nutrición enteral", weight: 1.3 },
   "22": { label: "Intervenciones específicas en UCI (instalación CVC, PICC, etc.)", weight: 2.8 },
-  "23": { label: "Intervenciones específicas fuera de la UCI (TAC, RNM, RX, etc.)", weight: 1.9 },
+  "23": { label: "Intervenciones específicas fuera de la UCI (TAC, RNM, RX, etc.)", weight: 1.9 }
 };
 const ORDER = ["1a","1b","1c","2","3","4a","4b","4c","5","6a","6b","6c","7a","7b","8a","8b","8c","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23"];
-const EXCLUSIVE_SETS = [
-  new Set(["1a","1b","1c"]),
-  new Set(["4a","4b","4c"]),
-  new Set(["6a","6b","6c"]),
-  new Set(["7a","7b"]),
-  new Set(["8a","8b","8c"]),
-];
+const EXCLUSIVE_SETS = [new Set(["1a","1b","1c"]), new Set(["4a","4b","4c"]), new Set(["6a","6b","6c"]), new Set(["7a","7b"]), new Set(["8a","8b","8c"])];
 
-/* ==================== Utilidades ==================== */
+const DEFAULTS = {
+  centers: ["Clínica Alemana","Clínica Las Condes","Clínica Santa María","Clínica Dávila","Clínica Indisa","Clínica Universidad de los Andes","Clínica Bupa Santiago","Clínica Vespucio","Clínica Bicentenario","Clínica Cordillera","Clínica Tabancura","Clínica RedSalud Santiago","Clínica RedSalud Providencia","Clínica UC San Carlos de Apoquindo","Hospital Clínico UC","Hospital del Salvador","Hospital Sótero del Río","Hospital San Juan de Dios","Hospital Barros Luco Trudeau","Hospital Félix Bulnes","Hospital Roberto del Río","Hospital Exequiel González Cortés","Hospital Calvo Mackenna","Hospital San Borja Arriarán","Hospital La Florida Eloísa Díaz","Hospital Padre Hurtado","Hospital El Pino","Hospital Metropolitano","Hospital Militar de Santiago","Hospital de Carabineros","Instituto Nacional del Tórax","Instituto Nacional del Cáncer","Instituto de Neurocirugía (INCA)","Hospital del Trabajador (ACHS)","Mutual de Seguridad (Hospital del Trabajador)","Otro / Centro privado"],
+  grd: ["Insuficiencia respiratoria aguda","Neumonía adquirida en la comunidad","Sepsis bacteriana","Shock séptico","EPOC reagudizado","IRA postquirúrgica","Traumatismo craneoencefálico","Pancreatitis aguda","IAM sin elevación ST","IAM con elevación ST"],
+  shift: ["Día","Noche"],
+  patient: ["N/A","Ingreso","Egreso"],
+  unit: ["UCI","UTI"],
+  auth_mode: "initials",
+  global_key: "NAS2025"
+};
+
 const $ = s => document.querySelector(s);
-const root = document.getElementById("appRoot");
-function normalizeStr(s){ return s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+function normalizeStr(s){ return s.normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
 function computeInitials(name){
   const stop = new Set(["de","del","la","las","los","y","da","do","das","dos"]);
   const tokens = normalizeStr(name).split(/\s+/).filter(Boolean);
   const letters = tokens.filter(t => !stop.has(t.toLowerCase())).map(t => t[0].toUpperCase());
   return letters.join("");
 }
-function slugify(name){ return normalizeStr(name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
 function numberToComma(n){ return n.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+function slugify(name){ return normalizeStr(name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
+function isExclusive(code){ return EXCLUSIVE_SETS.some(set=>set.has(code)); }
 
-/* ==================== Config Admin (local) ==================== */
-const DEFAULT_CENTERS = [
-  "Clínica Alemana","Clínica Las Condes","Clínica Santa María","Clínica Dávila","Clínica Indisa",
-  "Clínica Universidad de los Andes","Clínica Bupa Santiago","Clínica Vespucio","Clínica Bicentenario",
-  "Clínica Cordillera","Clínica Tabancura","Clínica RedSalud Santiago","Clínica RedSalud Providencia",
-  "Clínica UC San Carlos de Apoquindo","Hospital Clínico UC","Hospital del Salvador","Hospital Sótero del Río",
-  "Hospital San Juan de Dios","Hospital Barros Luco Trudeau","Hospital Félix Bulnes","Hospital Roberto del Río",
-  "Hospital Exequiel González Cortés","Hospital Calvo Mackenna","Hospital San Borja Arriarán","Hospital La Florida Eloísa Díaz",
-  "Hospital Padre Hurtado","Hospital El Pino","Hospital Metropolitano","Hospital Militar de Santiago",
-  "Hospital de Carabineros","Instituto Nacional del Tórax","Instituto Nacional del Cáncer","Instituto de Neurocirugía (INCA)",
-  "Hospital del Trabajador (ACHS)","Mutual de Seguridad (Hospital del Trabajador)","Otro / Centro privado"
-];
-const DEFAULT_GRD = [
-  "Insuficiencia respiratoria aguda","Neumonía adquirida en la comunidad","Sepsis bacteriana",
-  "Shock séptico","EPOC reagudizado","IRA postquirúrgica","Traumatismo craneoencefálico",
-  "Pancreatitis aguda","IAM sin elevación ST","IAM con elevación ST"
-];
-const DEFAULTS = {
-  centers: DEFAULT_CENTERS,
-  grd: DEFAULT_GRD,
-  shift: ["Día","Noche"],
-  patient: ["N/A","Ingreso","Egreso"],
-  unit: ["UCI","UTI"],
-  auth_mode: "initials", // "initials" | "global"
-  global_key: "NAS2025"
-};
 function loadAdmin(){
   const raw = localStorage.getItem("nas_admin_config");
   if (!raw) return { ...DEFAULTS };
-  try {
-    const cfg = JSON.parse(raw);
-    return { ...DEFAULTS, ...cfg };
-  } catch { return { ...DEFAULTS }; }
+  try { return { ...DEFAULTS, ...JSON.parse(raw) }; } catch { return { ...DEFAULTS }; }
 }
-function saveAdmin(cfg){
-  localStorage.setItem("nas_admin_config", JSON.stringify(cfg));
-}
+function saveAdmin(cfg){ localStorage.setItem("nas_admin_config", JSON.stringify(cfg)); }
 
-/* ==================== Vistas ==================== */
+/* ========== UI Renders ========== */
+const root = document.getElementById("appRoot");
+
 function renderLogin(){
   const cfg = loadAdmin();
   root.innerHTML = `
@@ -243,7 +189,7 @@ function renderApp(){
   const cfg = loadAdmin();
   root.innerHTML = `
     <h1>Aplicación de la Escala NAS</h1>
-    <p class="helper">Historial centralizado por centro (Firestore). Orden 1a→23. Ítems excluyentes en gris.</p>
+    <p class="helper">Historial centralizado en Google Sheets (por centro). Orden 1a→23. Ítems excluyentes en gris.</p>
 
     <form id="nasForm">
       <section class="card">
@@ -326,10 +272,10 @@ function renderApp(){
   document.getElementById("printBtn").addEventListener("click", ()=>window.print());
   document.getElementById("exportCsv").addEventListener("click", exportCSV);
 
-  loadHistory(); // Firestore
+  loadHistory(); // Sheets
 }
 
-/* ==================== Catálogo & cálculo ==================== */
+/* ===== Catálogo & cálculo ===== */
 function renderCatalog(){
   const grid = $("#catalogGrid");
   const items = ORDER.map(code => [code, NAS[code]]);
@@ -341,50 +287,32 @@ function renderCatalog(){
     </label>
   `).join("");
 }
-function isExclusive(code){ return EXCLUSIVE_SETS.some(set => set.has(code)); }
+function getSelectedCodes(){ return Array.from(document.querySelectorAll('input[type=checkbox][data-nas]:checked')).map(cb => cb.value); }
+function computeScore(codes){ return codes.reduce((acc, c) => acc + (NAS[c]?.weight || 0), 0); }
+function refreshSummary(){ $("#totalScore").textContent = numberToComma(computeScore(getSelectedCodes())); }
+function setDefaultDateTime(){
+  const f = $("#nasForm");
+  if (f && !f.created_at.value){
+    const now = new Date(); const pad = n=>String(n).padStart(2,'0');
+    f.created_at.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+}
 function exclusiveAuto(e){
   const code = e.target.value;
   for (const g of EXCLUSIVE_SETS){
     if (g.has(code)){
-      document.querySelectorAll('input[type=checkbox][data-nas]').forEach(cb => {
-        if (cb.value !== code && g.has(cb.value)) cb.checked = false;
-      });
+      document.querySelectorAll('input[type=checkbox][data-nas]').forEach(cb => { if (cb.value !== code && g.has(cb.value)) cb.checked = false; });
       break;
     }
   }
 }
-function getSelectedCodes(){
-  return Array.from(document.querySelectorAll('input[type=checkbox][data-nas]:checked')).map(cb => cb.value);
-}
-function computeScore(codes){
-  return codes.reduce((acc, c) => acc + (NAS[c]?.weight || 0), 0);
-}
-function refreshSummary(){
-  const total = computeScore(getSelectedCodes());
-  $("#totalScore").textContent = numberToComma(total);
-}
-function setDefaultDateTime(){
-  const f = $("#nasForm");
-  if (f && !f.created_at.value){
-    const now = new Date();
-    const pad = n => String(n).padStart(2,'0');
-    const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    f.created_at.value = local;
-  }
-}
 
-/* ==================== Firestore helpers ==================== */
-function currentFacility(){
-  const a = JSON.parse(localStorage.getItem("nas_auth") || "{}");
-  return a.facility || "default";
-}
-function facilityPath(){
-  return `facilities/${slugify(currentFacility())}/records`;
-}
+/* ===== Sheets backend helpers ===== */
+function currentFacility(){ const a = JSON.parse(localStorage.getItem("nas_auth") || "{}"); return a.facility || "default"; }
 
-/* Save */
 async function onSubmit(e){
   e.preventDefault();
+  if (!window.SHEETS_WEBAPP_URL || window.SHEETS_WEBAPP_URL.includes("PEGAR_AQUI")) { alert("Falta configurar la URL del Web App de Google."); return; }
   const f = e.target;
   const codes = getSelectedCodes();
   const payload = {
@@ -396,21 +324,28 @@ async function onSubmit(e){
     unit: f.unit.value || "UCI",
     grd: f.grd.value || "",
     note: f.note.value || "",
-    codes,
+    codes: codes.join(" "),
     total_score: computeScore(codes),
-    ts: Date.now()
   };
-  await addDoc(collection(db, facilityPath()), payload);
-  alert("Guardado en Firestore");
+  const res = await fetch(window.SHEETS_WEBAPP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok){ alert("Error al guardar en Google Sheets"); return; }
+  alert("Guardado en Google Sheets");
   f.reset(); renderCatalog(); setDefaultDateTime(); refreshSummary();
   await loadHistory();
 }
 
-/* Load */
 let lastRow = null;
 async function loadHistory(){
-  const qSnap = await getDocs(query(collection(db, facilityPath()), orderBy("created_at","desc")));
-  const rows = qSnap.docs.map(d => d.data());
+  if (!window.SHEETS_WEBAPP_URL || window.SHEETS_WEBAPP_URL.includes("PEGAR_AQUI")) { $("#history").innerHTML = "<p class='helper'>Configura la URL del Web App para ver el historial.</p>"; return; }
+  const url = window.SHEETS_WEBAPP_URL + "?facility=" + encodeURIComponent(currentFacility());
+  const res = await fetch(url, { method: "GET" });
+  if (!res.ok){ $("#history").innerHTML = "<p class='helper'>No se pudo cargar el historial.</p>"; return; }
+  const data = await res.json(); // { rows: [...] }
+  const rows = data.rows || [];
   lastRow = rows[0] || null;
   const table = [`<table><thead><tr>
     <th>Fecha</th><th>Identificador</th><th>Turno</th><th>Paciente</th><th>Unidad</th><th>GRD</th><th>Puntaje</th><th>Ítems</th><th>Nota</th>
@@ -423,8 +358,8 @@ async function loadHistory(){
       <td>${r.patient_status||"N/A"}</td>
       <td>${r.unit||"—"}</td>
       <td>${r.grd||"—"}</td>
-      <td>${numberToComma(r.total_score||0)}</td>
-      <td>${Array.isArray(r.codes)?r.codes.join(", "):"—"}</td>
+      <td>${numberToComma(Number(r.total_score||0))}</td>
+      <td>${r.codes||"—"}</td>
       <td>${r.note||"—"}</td>
     </tr>`);
   }
@@ -432,9 +367,8 @@ async function loadHistory(){
   $("#history").innerHTML = table.join("");
 }
 
-/* Duplicate last */
 function restoreLast(){
-  if (!lastRow){ alert("No hay registros previos en este centro."); return; }
+  if (!lastRow){ alert("No hay registros previos para este centro."); return; }
   const f = $("#nasForm");
   f.identifier.value = lastRow.identifier || "";
   f.shift.value = lastRow.shift || "Día";
@@ -442,16 +376,18 @@ function restoreLast(){
   f.patient_status.value = lastRow.patient_status || "N/A";
   f.unit.value = lastRow.unit || "UCI";
   if (lastRow.grd) f.grd.value = lastRow.grd;
-  if (lastRow.created_at) f.created_at.value = lastRow.created_at.replace(" ","T");
-  const prev = lastRow.codes || [];
+  if (lastRow.created_at) f.created_at.value = String(lastRow.created_at).replace(" ","T");
+  const prev = String(lastRow.codes||"").split(/\s+/).filter(Boolean);
   document.querySelectorAll('input[type=checkbox][data-nas]').forEach(cb => cb.checked = prev.includes(cb.value));
   refreshSummary();
 }
 
-/* Export CSV */
 async function exportCSV(){
-  const qSnap = await getDocs(query(collection(db, facilityPath()), orderBy("created_at","desc")));
-  const rows = qSnap.docs.map(d => d.data());
+  if (!window.SHEETS_WEBAPP_URL || window.SHEETS_WEBAPP_URL.includes("PEGAR_AQUI")) { alert("Configura la URL del Web App."); return; }
+  const res = await fetch(window.SHEETS_WEBAPP_URL + "?facility=" + encodeURIComponent(currentFacility()), { method: "GET" });
+  if (!res.ok){ alert("No se pudo exportar."); return; }
+  const data = await res.json();
+  const rows = data.rows || [];
   if (rows.length === 0){ alert("No hay datos para exportar."); return; }
   const headers = ["facility","created_at","identifier","shift","patient_status","unit","grd","total_score","codes","note"];
   const csv = [headers.join(",")].concat(rows.map(r => [
@@ -463,7 +399,7 @@ async function exportCSV(){
     `"${(r.unit||"—").replace(/"/g,'""')}"`,
     `"${(r.grd||"").replace(/"/g,'""')}"`,
     (r.total_score ?? 0),
-    `"${(Array.isArray(r.codes)?r.codes.join(" "):"").replace(/"/g,'""')}"`,
+    `"${(r.codes||"").replace(/"/g,'""')}"`,
     `"${(r.note||"").replace(/"/g,'""')}"`
   ].join(","))).join("\n");
   const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
@@ -475,7 +411,7 @@ async function exportCSV(){
   URL.revokeObjectURL(url);
 }
 
-/* ==================== Bootstrap ==================== */
+/* Bootstrap */
 document.addEventListener("DOMContentLoaded", () => {
   const a = JSON.parse(localStorage.getItem("nas_auth") || "{}");
   if (a && a.facility){ renderApp(); } else { renderLogin(); }

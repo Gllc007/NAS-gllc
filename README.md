@@ -1,56 +1,22 @@
-# Formulario NAS v7.1 (Firebase · Full)
+# Formulario NAS v7.2 (Google Sheets · Full)
 
-Esta versión guarda los **registros NAS en Firestore** de forma **centralizada** y mantiene:
-- Pantalla de inicio con **centro** + validación por **iniciales** o **clave global** (configurable).
-- **Panel admin** (usuario: `gllc007`, contraseña: `Gl5351957C.`) para editar centros, modo de clave y listas (Turno, Paciente, Unidad, GRD).
-- Formulario completo con **GRD**, orden **1a→23**, exclusión automática (1a/1b/1c, 4a/4b/4c, 6a/6b/6c, 7a/7b, 8a/8b/8c), franjas zebra.
-- **Historial por centro** (consulta a Firestore), **Duplicar última**, **Imprimir**, **Exportar CSV**.
+Centraliza los registros en **Google Sheets** usando un **Apps Script Web App** (doPost/doGet).
+Incluye: inicio por centro (clave por iniciales o global), panel Admin (usuario `gllc007`, contraseña `Gl5351957C.`),
+GRD, exclusiones 1a–23, zebra, duplicar, imprimir y exportar CSV.
 
-## ⚙️ Pasos para implementar Firebase
-1) Crea tu proyecto en **Firebase Console** → *Add project* (Analytics opcional).
-2) Activa **Firestore Database** → *Create database* → **Production mode** → región cercana.
-3) Activa **Authentication** → *Get started* → habilita **Anonymous** (o configura email/contraseña si prefieres).
-4) En *Project settings → General → Your apps (Web)* registra tu app y copia el bloque de configuración.
-5) Abre `index.html` y reemplaza el objeto:
-```js
-window.FIREBASE_CONFIG = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  projectId: "TU_PROYECTO",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "ID",
-  appId: "APP_ID"
-};
+## Despliegue
+1. **Google Sheets**: crea hoja (ej. "NAS Registros").
+2. **Apps Script** (Extensiones → Apps Script) y pega:
+```javascript
+const SHEET_NAME = 'nas_records';
+function _headers(){ return ['timestamp','facility','created_at','identifier','shift','patient_status','unit','grd','total_score','codes','note']; }
+function _getSheet(){ const ss=SpreadsheetApp.getActiveSpreadsheet(); let sh=ss.getSheetByName(SHEET_NAME); if(!sh){ sh=ss.insertSheet(SHEET_NAME); sh.appendRow(_headers()); } return sh; }
+function doPost(e){ try{ const d=JSON.parse(e.postData.contents); const sh=_getSheet(); sh.appendRow([new Date(),d.facility||'',d.created_at||'',d.identifier||'',d.shift||'',d.patient_status||'',d.unit||'',d.grd||'',Number(d.total_score||0),d.codes||'',d.note||'']); return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);}catch(err){ return ContentService.createTextOutput(JSON.stringify({ok:false,error:String(err)})).setMimeType(ContentService.MimeType.JSON);} }
+function doGet(e){ const fac=(e.parameter.facility||'').trim(); const sh=_getSheet(); const values=sh.getDataRange().getValues(); const rows=values.slice(1).map(r=>({timestamp:r[0],facility:r[1],created_at:r[2],identifier:r[3],shift:r[4],patient_status:r[5],unit:r[6],grd:r[7],total_score:r[8],codes:r[9],note:r[10]})); const filtered=fac?rows.filter(r=>(r.facility||'')===fac):rows; filtered.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))); return ContentService.createTextOutput(JSON.stringify({rows:filtered})).setMimeType(ContentService.MimeType.JSON); }
 ```
-6) **Reglas de seguridad** (Firestore → Rules). Publica algo como:
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Registros NAS por centro
-    match /facilities/{facility}/records/{doc} {
-      allow read, write: if request.auth != null; // requiere usuario autenticado (anónimo sirve)
-    }
-  }
-}
-```
-> Si luego quieres restringir por dominio de tu sitio o por roles, te ayudo a afinar las reglas.
+3. **Deploy → Web app**: *Execute as*: Me · *Who has access*: Anyone (o Anyone with link). Copia la **URL** `/exec`.
+4. En `index.html`, pega la URL en `window.SHEETS_WEBAPP_URL`.
+5. Sube `index.html` + `assets/` a GitHub Pages. Usa `?v=7.2` para forzar caché.
 
-## 🗃️ Estructura en Firestore
-Los registros se guardan en subcolecciones por centro:
-```
-facilities/{slug-del-centro}/records/{autoid}
-```
-Cada documento incluye:
-`facility, created_at, identifier, shift, patient_status, unit, grd, note, codes[], total_score, ts`.
-
-## 🚀 Publicar
-- Sube `index.html` y la carpeta `assets/` a tu repo en GitHub Pages / Netlify / Vercel.
-- Si no ves cambios, abre con `?v=7.1` al final de la URL para evitar caché.
-
-## 🔐 Admin
-- Botón **Acceso admin** en la pantalla inicial.
-- Usuario: **gllc007** · Contraseña: **Gl5351957C.**
-- Configuración guardada en `localStorage` bajo `nas_admin_config`.
-
-¿Quieres que además agreguemos **filtros por fecha** en el historial y un **dashboard** con gráficos? Puedo incorporarlo.
+### Seguridad opcional
+- Token secreto en doPost/doGet y validación en el front; puedo integrarlo si lo necesitas.
